@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Power Analyst - Professional Suite</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Leaflet.draw -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <!-- Chart.js for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- jsPDF and html2canvas for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow: hidden; }
+        #map { height: 100vh; width: 100%; cursor: default; }
+        .leaflet-container { background: #f0f0f0; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #f59e0b; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .modal { transition: opacity 0.25s ease; }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div id="app-container" class="flex flex-col md:flex-row h-screen">
+        <!-- Control Panel -->
+        <div id="control-panel" class="w-full md:w-1/3 lg:w-1/4 bg-white shadow-lg p-6 overflow-y-auto custom-scrollbar">
+            <div class="flex items-center mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="text-yellow-500 mr-3" viewBox="0 0 16 16">
+                    <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
+                </svg>
+                <h1 class="text-2xl font-bold text-gray-800">Solar Power Analyst</h1>
+            </div>
+
+            <!-- Sections -->
+            <div class="space-y-4">
+                <!-- Site Definition -->
+                <details class="group" open>
+                    <summary class="text-lg font-semibold text-gray-700 cursor-pointer list-none"><div class="flex items-center justify-between"><span>1. Site Definition</span><span class="text-gray-500 group-open:rotate-90 transition-transform duration-200">&#9656;</span></div></summary>
+                    <div class="mt-2 space-y-3 pt-2 border-t">
+                        <p class="text-sm text-gray-500">Use the draw tools on the map to outline the project area.</p>
+                        <div class="bg-gray-50 p-3 rounded-lg space-y-2">
+                            <div><p class="text-sm font-medium text-gray-600">Site Area: <span id="area-display" class="font-mono text-gray-800">- km²</span></p></div>
+                            <div><p class="text-sm font-medium text-gray-600">Centroid: <span id="coordinates" class="font-mono text-gray-800">-</span></p></div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Solar Plant Layout -->
+                <details class="group" open>
+                    <summary class="text-lg font-semibold text-gray-700 cursor-pointer list-none"><div class="flex items-center justify-between"><span>2. Solar Plant Layout</span><span class="text-gray-500 group-open:rotate-90 transition-transform duration-200">&#9656;</span></div></summary>
+                    <div class="mt-2 space-y-3 pt-2 border-t">
+                        <label for="panel-select" class="text-sm font-medium text-gray-600 block">Solar Panel Model:</label>
+                        <select id="panel-select" class="w-full p-2 border border-gray-300 rounded-lg bg-white"></select>
+                        <div id="panel-specs" class="bg-gray-50 p-3 rounded-lg hidden"></div>
+                        <label for="gcr-input" class="text-sm font-medium text-gray-600 block">Ground Coverage Ratio (GCR):</label>
+                        <input type="number" id="gcr-input" value="0.4" step="0.05" min="0.1" max="0.9" class="w-full p-2 border border-gray-300 rounded-lg">
+                        <div class="bg-blue-50 p-3 rounded-lg text-center">
+                            <p class="text-sm font-medium text-gray-600">Estimated Plant Capacity:</p>
+                            <p id="estimated-capacity" class="text-lg font-bold text-blue-700">- MWp</p>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Solar Resource -->
+                 <details class="group" open>
+                    <summary class="text-lg font-semibold text-gray-700 cursor-pointer list-none"><div class="flex items-center justify-between"><span>3. Solar Resource</span><span class="text-gray-500 group-open:rotate-90 transition-transform duration-200">&#9656;</span></div></summary>
+                    <div class="mt-2 space-y-3 pt-2 border-t">
+                        <button id="fetch-solar-btn" class="w-full bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 flex items-center justify-center space-x-2"><span>Fetch Solar Data</span></button>
+                        <div id="solar-data-display" class="bg-gray-50 p-3 rounded-lg text-center hidden">
+                            <p class="text-sm font-medium text-gray-600">Avg. Daily GHI:</p>
+                            <p id="fetched-ghi" class="text-lg font-bold text-yellow-700">- kWh/m²/day</p>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- System Losses -->
+                <details class="group">
+                    <summary class="text-lg font-semibold text-gray-700 cursor-pointer list-none"><div class="flex items-center justify-between"><span>4. System Losses</span><span class="text-gray-500 group-open:rotate-90 transition-transform duration-200">&#9656;</span></div></summary>
+                    <div class="mt-2 space-y-3 pt-2 border-t grid grid-cols-2 gap-4">
+                        <div><label class="text-sm font-medium">Soiling (%):</label><input type="number" id="soiling-loss" value="2" class="w-full p-2 border rounded-lg"></div>
+                        <div><label class="text-sm font-medium">Inverter (%):</label><input type="number" id="inverter-loss" value="2.5" class="w-full p-2 border rounded-lg"></div>
+                        <div><label class="text-sm font-medium">Cabling (%):</label><input type="number" id="cabling-loss" value="2" class="w-full p-2 border rounded-lg"></div>
+                        <div><label class="text-sm font-medium">Availability (%):</label><input type="number" id="availability" value="98" class="w-full p-2 border rounded-lg"></div>
+                        <div class="col-span-2"><label class="text-sm font-medium">LID & Mismatch (%):</label><input type="number" id="lid-loss" value="2" class="w-full p-2 border rounded-lg"></div>
+                        <div class="col-span-2 bg-gray-100 p-2 rounded-lg text-center"><p class="text-sm font-semibold">Total Performance Ratio: <span id="performance-ratio" class="font-bold">-</span></p></div>
+                    </div>
+                </details>
+
+                <!-- Financial Analysis -->
+                <details class="group">
+                    <summary class="text-lg font-semibold text-gray-700 cursor-pointer list-none"><div class="flex items-center justify-between"><span>5. Financial Analysis</span><span class="text-gray-500 group-open:rotate-90 transition-transform duration-200">&#9656;</span></div></summary>
+                    <div class="mt-2 space-y-3 pt-2 border-t">
+                         <div><label for="electricity-price" class="text-sm font-medium text-gray-600 block">Electricity Rate (PHP/kWh):</label><input type="number" id="electricity-price" value="6.08" class="w-full p-2 border rounded-lg" step="0.01"></div>
+                         <div class="grid grid-cols-2 gap-2">
+                             <div><label class="text-sm font-medium">CAPEX (USD/kWp):</label><input type="number" id="capex" value="850" class="w-full p-2 border rounded-lg"></div>
+                             <div><label class="text-sm font-medium">OPEX (USD/kWp/yr):</label><input type="number" id="opex" value="15" class="w-full p-2 border rounded-lg"></div>
+                         </div>
+                         <div class="grid grid-cols-2 gap-2">
+                             <div><label class="text-sm font-medium">Lifetime (yrs):</label><input type="number" id="lifetime" value="25" class="w-full p-2 border rounded-lg"></div>
+                             <div><label class="text-sm font-medium">Degradation (%/yr):</label><input type="number" id="degradation" value="0.5" class="w-full p-2 border rounded-lg"></div>
+                         </div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Actions & Results -->
+            <div class="mt-6 pt-6 border-t">
+                <button id="calculate-btn" class="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 text-lg font-bold">Analyze Project</button>
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <button id="show-charts-btn" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400" disabled>View Charts</button>
+                    <button id="export-pdf-btn" class="w-full bg-gray-700 text-white py-2 rounded-lg hover:bg-gray-800 disabled:bg-gray-400" disabled>Export PDF</button>
+                </div>
+            </div>
+            <div id="results-container" class="bg-gray-100 p-4 rounded-lg mt-4 hidden"></div>
+            <div id="message-box" class="mt-4 p-3 rounded-lg text-center font-medium hidden"></div>
+        </div>
+
+        <!-- Map Container -->
+        <div id="map-container" class="flex-1"><div id="map"></div></div>
+    </div>
+
+    <!-- Modals & Hidden Elements -->
+    <div id="charts-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden"><div class="bg-white w-11/12 md:max-w-3xl mx-auto rounded shadow-lg"><div class="p-6"><div class="flex justify-between items-center pb-3"><p class="text-2xl font-bold">Analysis Charts</p><button id="modal-close-btn" class="cursor-pointer z-50 text-2xl">&times;</button></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-4"><canvas id="monthlyIrradianceChart"></canvas><canvas id="monthlyEnergyChart"></canvas></div></div></div></div>
+    <div id="report-container" class="absolute -left-full bg-white p-8"></div>
+
+    <script>
+        // --- DATA ---
+        const solarPanelModels = [
+            { name: "Generic Mono-PERC 450W", power_Wp: 450, efficiency: 0.207, width_m: 1.04, height_m: 2.09 },
+            { name: "Generic Mono-PERC 550W", power_Wp: 550, efficiency: 0.213, width_m: 1.13, height_m: 2.28 },
+            { name: "Generic Bifacial 600W", power_Wp: 600, efficiency: 0.215, width_m: 1.30, height_m: 2.17 },
+            { name: "Jinko Solar Tiger Pro 545W", power_Wp: 545, efficiency: 0.211, width_m: 1.134, height_m: 2.274 },
+            { name: "LONGi Hi-MO 5 540W", power_Wp: 540, efficiency: 0.211, width_m: 1.133, height_m: 2.256 },
+            { name: "Canadian Solar HiKu6 590W", power_Wp: 590, efficiency: 0.211, width_m: 1.303, height_m: 2.172 },
+            { name: "Trina Solar Vertex S 405W", power_Wp: 405, efficiency: 0.211, width_m: 1.134, height_m: 1.762 },
+            { name: "First Solar Series 6 450W", power_Wp: 450, efficiency: 0.185, width_m: 1.23, height_m: 2.01 }, // Thin-film
+        ];
+
+        // --- DOM & STATE ---
+        const ui = {
+            mapElement: document.getElementById('map'),
+            coordinatesDisplay: document.getElementById('coordinates'),
+            areaDisplay: document.getElementById('area-display'),
+            panelSelect: document.getElementById('panel-select'),
+            panelSpecsDisplay: document.getElementById('panel-specs'),
+            gcrInput: document.getElementById('gcr-input'),
+            estimatedCapacity: document.getElementById('estimated-capacity'),
+            fetchSolarBtn: document.getElementById('fetch-solar-btn'),
+            solarDataDisplay: document.getElementById('solar-data-display'),
+            fetchedGhi: document.getElementById('fetched-ghi'),
+            performanceRatioDisplay: document.getElementById('performance-ratio'),
+            electricityPriceInput: document.getElementById('electricity-price'),
+            calculateBtn: document.getElementById('calculate-btn'),
+            showChartsBtn: document.getElementById('show-charts-btn'),
+            exportPdfBtn: document.getElementById('export-pdf-btn'),
+            resultsContainer: document.getElementById('results-container'),
+            messageBox: document.getElementById('message-box'),
+            chartsModal: document.getElementById('charts-modal'),
+            modalCloseBtn: document.getElementById('modal-close-btn'),
+            reportContainer: document.getElementById('report-container'),
+            lossInputs: document.querySelectorAll('#control-panel details[class="group"] input[type="number"]')
+        };
+        let map, drawnItems, solarAreaLayer;
+        let selectedCoords = null, selectedArea = 0, fetchedGhi = 0, plantCapacityMWp = 0;
+        let monthlyIrradianceChart, monthlyEnergyChart;
+        let lastAnalysisData = {};
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            populateSelectors();
+            setupEventListeners();
+            calculatePerformanceRatio(); // Initial calculation
+        });
+
+        // --- SETUP FUNCTIONS ---
+        function initMap() {
+            map = L.map(ui.mapElement).setView([12.8797, 121.7740], 6);
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
+            const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap &copy; CARTO' }).addTo(map);
+            
+            const baseMaps = { "Street": streetLayer, "Satellite": satelliteLayer };
+            L.control.layers(baseMaps).addTo(map);
+
+            drawnItems = new L.FeatureGroup();
+            solarAreaLayer = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+            map.addLayer(solarAreaLayer);
+            
+            const drawControl = new L.Control.Draw({ edit: { featureGroup: drawnItems }, draw: { polygon: true, rectangle: true, polyline: false, circle: false, marker: false, circlemarker: false } });
+            map.addControl(drawControl);
+            map.on(L.Draw.Event.CREATED, onDrawCreated);
+            map.on(L.Draw.Event.EDITED, (e) => updateAreaInfo(e.layers.getLayers()[0]));
+            map.on(L.Draw.Event.DELETED, onAreaDeleted);
+        }
+
+        function populateSelectors() {
+            ui.panelSelect.innerHTML = '<option value="" disabled selected>Select panel...</option>';
+            solarPanelModels.sort((a, b) => a.name.localeCompare(b.name)).forEach((m, i) => ui.panelSelect.add(new Option(m.name, i)));
+        }
+
+        function setupEventListeners() {
+            ui.calculateBtn.addEventListener('click', onCalculate);
+            ui.showChartsBtn.addEventListener('click', () => ui.chartsModal.classList.remove('hidden'));
+            ui.modalCloseBtn.addEventListener('click', () => ui.chartsModal.classList.add('hidden'));
+            ui.exportPdfBtn.addEventListener('click', generatePDFReport);
+            ui.panelSelect.addEventListener('change', onPanelSelect);
+            ui.gcrInput.addEventListener('input', updateCapacityEstimate);
+            ui.fetchSolarBtn.addEventListener('click', fetchSolarData);
+            ui.lossInputs.forEach(input => input.addEventListener('input', calculatePerformanceRatio));
+        }
+
+        // --- EVENT HANDLERS & UI LOGIC ---
+        function onDrawCreated(e) {
+            drawnItems.clearLayers();
+            drawnItems.addLayer(e.layer);
+            updateAreaInfo(e.layer);
+        }
+        
+        function onAreaDeleted() {
+            selectedArea = 0;
+            selectedCoords = null;
+            fetchedGhi = 0;
+            plantCapacityMWp = 0;
+            ui.areaDisplay.textContent = '- km²';
+            ui.coordinatesDisplay.textContent = '-';
+            ui.estimatedCapacity.textContent = '- MWp';
+            ui.solarDataDisplay.classList.add('hidden');
+            solarAreaLayer.clearLayers();
+        }
+
+        function updateAreaInfo(layer) {
+            const latlngs = layer.getLatLngs()[0];
+            selectedArea = L.GeometryUtil.geodesicArea(latlngs); // in square meters
+            ui.areaDisplay.textContent = `${(selectedArea / 1e6).toFixed(2)} km²`;
+            selectedCoords = layer.getBounds().getCenter();
+            ui.coordinatesDisplay.textContent = `${selectedCoords.lat.toFixed(5)}, ${selectedCoords.lng.toFixed(5)}`;
+            updateCapacityEstimate();
+        }
+        
+        function onPanelSelect() {
+            const model = getSelectedPanel();
+            if (!model) return;
+            ui.panelSpecsDisplay.innerHTML = `<p class="text-sm"><span class="font-semibold">Pmax:</span> ${model.power_Wp} Wp | <span class="font-semibold">Eff:</span> ${(model.efficiency * 100).toFixed(1)}% | <span class="font-semibold">Size:</span> ${model.width_m}x${model.height_m} m</p>`;
+            ui.panelSpecsDisplay.classList.remove('hidden');
+            updateCapacityEstimate();
+        }
+
+        function updateCapacityEstimate() {
+            const model = getSelectedPanel();
+            const gcr = parseFloat(ui.gcrInput.value);
+            if (!model || selectedArea === 0 || isNaN(gcr)) {
+                plantCapacityMWp = 0;
+                ui.estimatedCapacity.textContent = '- MWp';
+                return;
+            }
+            
+            const panelArea = model.width_m * model.height_m;
+            const landAreaPerPanel = panelArea / gcr;
+            const numPanels = Math.floor(selectedArea / landAreaPerPanel);
+            
+            plantCapacityMWp = (numPanels * model.power_Wp) / 1e6; // to MWp
+            ui.estimatedCapacity.textContent = `${plantCapacityMWp.toFixed(2)} MWp`;
+            
+            // Visualize solar area
+            solarAreaLayer.clearLayers();
+            if (drawnItems.getLayers().length > 0) {
+                const polygon = drawnItems.getLayers()[0];
+                // Create an inner polygon to represent GCR. This is a simplification.
+                const scaledPolygon = L.polygon(polygon.getLatLngs(), {
+                    color: '#f59e0b',
+                    weight: 2,
+                    fillColor: '#f59e0b',
+                    fillOpacity: 0.5
+                }).addTo(solarAreaLayer);
+            }
+        }
+
+        async function fetchSolarData() {
+            if (!selectedCoords) {
+                showMessage('Please define a project area first.', 'error');
+                return;
+            }
+            const btn = ui.fetchSolarBtn;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<div class="loader"></div>';
+            btn.disabled = true;
+
+            const { lat, lng } = selectedCoords;
+            // Get a date range for the last full year
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() - 1); // Yesterday
+            const startDate = new Date(endDate);
+            startDate.setFullYear(startDate.getFullYear() - 1);
+            
+            const formatDate = (date) => date.toISOString().split('T')[0];
+
+            const apiUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${formatDate(startDate)}&end_date=${formatDate(endDate)}&daily=shortwave_radiation_sum&timezone=auto`;
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+                const data = await response.json();
+                
+                const dailyTotals_MJ_m2 = data.daily.shortwave_radiation_sum.filter(s => s !== null);
+                // Convert from MJ/m²/day to kWh/m²/day (1 MJ = 0.277778 kWh)
+                const dailyTotals_kWh_m2 = dailyTotals_MJ_m2.map(val => val * 0.277778);
+                const avgGhi = dailyTotals_kWh_m2.reduce((a, b) => a + b, 0) / dailyTotals_kWh_m2.length;
+                
+                fetchedGhi = avgGhi;
+                ui.fetchedGhi.textContent = `${avgGhi.toFixed(2)} kWh/m²/day`;
+                ui.solarDataDisplay.classList.remove('hidden');
+                showMessage('Successfully fetched historical solar data.', 'success');
+            } catch (error) {
+                showMessage(`Failed to fetch solar data: ${error.message}`, 'error');
+                fetchedGhi = 0;
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // --- CORE CALCULATIONS ---
+        function onCalculate() {
+            const model = getSelectedPanel();
+            const electricityPrice = parseFloat(ui.electricityPriceInput.value);
+            
+            if (!selectedCoords || !model || plantCapacityMWp <= 0 || fetchedGhi <= 0 || isNaN(electricityPrice) || electricityPrice < 0) {
+                showMessage('Please ensure Area, Panel, Solar Data, and Electricity Rate are valid.', 'error');
+                return;
+            }
+
+            const performanceRatio = calculatePerformanceRatio();
+            const annualGhi = fetchedGhi * 365; // kWh/m²/year
+            const capacity_kWp = plantCapacityMWp * 1000;
+
+            // AEP = Capacity (kWp) * Annual GHI (kWh/m²/yr) * PR / (1000 W/m² STC irradiance)
+            // The formula simplifies as GHI is often expressed in Peak Sun Hours (PSH), where 1 PSH = 1 kWh/m².
+            // So, AEP (kWh) = Capacity (kWp) * PSH_annual * PR
+            const netAEP_kWh = capacity_kWp * annualGhi * performanceRatio;
+            const totalAep_GWh = netAEP_kWh / 1e6;
+            
+            const annualRevenue = netAEP_kWh * electricityPrice; // PHP
+            const specificYield = netAEP_kWh / capacity_kWp; // kWh/kWp/year
+            
+            lastAnalysisData = { 
+                model, 
+                capacityMWp: plantCapacityMWp, 
+                ghi: fetchedGhi, 
+                totalAep_GWh, 
+                performanceRatio,
+                specificYield,
+                area: selectedArea / 1e6, 
+                coords: selectedCoords, 
+                annualRevenue 
+            };
+            
+            ui.resultsContainer.innerHTML = `
+                <h2 class="text-lg font-semibold text-gray-800 mb-3 text-center">Project Analysis Results</h2>
+                <div class="space-y-2">
+                    <p><strong>Total Net AEP (Year 1):</strong> <span class="font-bold text-green-600 text-xl">${totalAep_GWh.toFixed(2)} GWh/yr</span></p>
+                    <p><strong>Specific Yield:</strong> <span class="font-bold text-blue-600">${specificYield.toFixed(0)} kWh/kWp/yr</span></p>
+                    <p class="border-t pt-2 mt-2"><strong>Est. Annual Revenue (Year 1):</strong> <span class="font-bold text-green-700 text-xl">₱ ${formatRevenue(annualRevenue)} /yr</span></p>
+                </div>
+            `;
+            ui.resultsContainer.classList.remove('hidden');
+            ui.showChartsBtn.disabled = false;
+            ui.exportPdfBtn.disabled = false;
+            showMessage('Analysis successful!', 'success');
+            createCharts();
+        }
+
+        function calculatePerformanceRatio() {
+            const soiling = parseFloat(document.getElementById('soiling-loss').value) / 100;
+            const inverter = parseFloat(document.getElementById('inverter-loss').value) / 100;
+            const cabling = parseFloat(document.getElementById('cabling-loss').value) / 100;
+            const availability = (100 - parseFloat(document.getElementById('availability').value)) / 100;
+            const lid = parseFloat(document.getElementById('lid-loss').value) / 100;
+            
+            // Assume other minor losses (temp, etc.) are implicitly ~10%
+            const baseEfficiency = 0.90; 
+
+            const pr = baseEfficiency * (1 - soiling) * (1 - inverter) * (1 - cabling) * (1 - availability) * (1 - lid);
+            ui.performanceRatioDisplay.textContent = `${(pr * 100).toFixed(1)}%`;
+            return pr;
+        }
+
+        // --- HELPER & UTILITY FUNCTIONS ---
+        function getSelectedPanel() { return ui.panelSelect.value !== "" ? solarPanelModels[ui.panelSelect.value] : null; }
+
+        function showMessage(text, type) {
+            const box = ui.messageBox;
+            box.className = 'mt-4 p-3 rounded-lg text-center font-medium'; // Reset classes
+            if (type === 'success') box.classList.add('bg-green-100', 'text-green-800');
+            else if (type === 'error') box.classList.add('bg-red-100', 'text-red-800');
+            else box.classList.add('bg-blue-100', 'text-blue-800');
+            box.textContent = text;
+            box.classList.remove('hidden');
+        }
+
+        function createCharts() {
+            const { ghi, totalAep_GWh } = lastAnalysisData;
+            if (!ghi) return;
+
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            // Simplified seasonal variation for GHI
+            const seasonalFactors = [0.85, 0.95, 1.1, 1.2, 1.15, 1.0, 0.95, 0.9, 0.95, 1.0, 0.9, 0.8];
+            const monthlyGhiData = seasonalFactors.map(factor => ghi * factor);
+            const monthlyEnergyData = monthlyGhiData.map(monthlyGhi => (totalAep_GWh / (ghi * 12)) * monthlyGhi);
+
+            // Monthly Irradiance Chart
+            const miCtx = document.getElementById('monthlyIrradianceChart').getContext('2d');
+            if (monthlyIrradianceChart) monthlyIrradianceChart.destroy();
+            monthlyIrradianceChart = new Chart(miCtx, {
+                type: 'bar',
+                data: { 
+                    labels: months, 
+                    datasets: [{ 
+                        label: 'Avg Daily GHI (kWh/m²/day)', 
+                        data: monthlyGhiData, 
+                        backgroundColor: 'rgba(245, 158, 11, 0.7)' 
+                    }] 
+                },
+                options: { scales: { y: { beginAtZero: true, title: { display: true, text: 'GHI' } } } }
+            });
+
+            // Monthly Energy Production Chart
+            const meCtx = document.getElementById('monthlyEnergyChart').getContext('2d');
+            if (monthlyEnergyChart) monthlyEnergyChart.destroy();
+            monthlyEnergyChart = new Chart(meCtx, {
+                type: 'bar',
+                data: { 
+                    labels: months, 
+                    datasets: [{ 
+                        label: 'Net Energy (GWh)', 
+                        data: monthlyEnergyData, 
+                        backgroundColor: 'rgba(37, 99, 235, 0.7)' 
+                    }] 
+                },
+                options: { scales: { y: { beginAtZero: true, title: { display: true, text: 'Energy (GWh)' } } } }
+            });
+        }
+
+        async function generatePDFReport() {
+            showMessage('Generating PDF report...', 'info');
+            const { model, capacityMWp, ghi, totalAep_GWh, performanceRatio, specificYield, area, coords, annualRevenue } = lastAnalysisData;
+            
+            const tempMapElement = document.createElement('div');
+            tempMapElement.style.width = '800px';
+            tempMapElement.style.height = '600px';
+            document.body.appendChild(tempMapElement);
+            
+            // Wait for the map to render before capturing
+            await new Promise(resolve => {
+                const reportMap = L.map(tempMapElement).setView(coords, map.getZoom());
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    // Ensure tiles are loaded before we resolve
+                    onload: () => setTimeout(resolve, 500) 
+                }).addTo(reportMap);
+                drawnItems.eachLayer(layer => { L.polygon(layer.getLatLngs(), { color: '#3388ff' }).addTo(reportMap); });
+                solarAreaLayer.eachLayer(layer => { L.polygon(layer.getLatLngs(), { color: '#f59e0b', fillOpacity: 0.5 }).addTo(reportMap); });
+            });
+            
+            const mapCanvas = await html2canvas(tempMapElement);
+            const mapImage = mapCanvas.toDataURL('image/png');
+            document.body.removeChild(tempMapElement);
+
+            ui.reportContainer.innerHTML = `
+                <div class="w-[700px]">
+                    <h1 class="text-3xl font-bold mb-4 text-yellow-700">Solar Power Project Analysis Report</h1>
+                    <p class="text-sm text-gray-500 mb-6">Generated on: ${new Date().toLocaleDateString()}</p>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <h2 class="text-xl font-semibold border-b pb-2 mb-2">Project Summary</h2>
+                            <p><strong>Location (Centroid):</strong> ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}</p>
+                            <p><strong>Site Area:</strong> ${area.toFixed(2)} km²</p>
+                            <p><strong>Panel Model:</strong> ${model.name}</p>
+                            <p><strong>Total Capacity:</strong> ${capacityMWp.toFixed(2)} MWp</p>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-semibold border-b pb-2 mb-2">Energy & Performance</h2>
+                            <p><strong>Avg. Daily GHI:</strong> ${ghi.toFixed(2)} kWh/m²/day</p>
+                            <p><strong>Performance Ratio:</strong> ${(performanceRatio * 100).toFixed(1)} %</p>
+                            <p><strong>Specific Yield:</strong> ${specificYield.toFixed(0)} kWh/kWp/yr</p>
+                            <p><strong>Net AEP (Year 1):</strong> ${totalAep_GWh.toFixed(2)} GWh/yr</p>
+                        </div>
+                        <div class="col-span-2">
+                             <h2 class="text-xl font-semibold border-b pb-2 mb-2">Financial Analysis</h2>
+                             <p><strong>Est. Annual Revenue (Year 1):</strong> ₱ ${formatRevenue(annualRevenue)}</p>
+                        </div>
+                    </div>
+                    <h2 class="text-xl font-semibold border-b pb-2 mb-2 mt-6">Project Site Map</h2>
+                    <img src="${mapImage}" class="w-full border" />
+                </div>
+            `;
+            
+            const { jsPDF } = window.jspdf;
+            const reportCanvas = await html2canvas(ui.reportContainer);
+            const imgData = reportCanvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (reportCanvas.height * pdfWidth) / reportCanvas.width;
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save('Solar_Power_Analysis_Report.pdf');
+
+            showMessage('PDF report downloaded.', 'success');
+        }
+
+        function formatRevenue(value) {
+            if (value >= 1e9) return `${(value / 1e9).toFixed(2)} B`;
+            if (value >= 1e6) return `${(value / 1e6).toFixed(2)} M`;
+            return value.toLocaleString('en-US', {maximumFractionDigits: 0});
+        }
+    </script>
+</body>
+</html>
